@@ -22,11 +22,22 @@ app.get("/info", (req, res) => {
     console.log(`Using yt-dlp at: ${ytDlpPath} on platform: ${process.platform}`);
     const ytDlp = spawn(ytDlpPath, ["--dump-json", "--skip-download", videoURL]);
 
+    ytDlp.on("error", (err) => {
+        console.error("Failed to start yt-dlp:", err);
+        if (!res.headersSent) res.status(500).json({ error: "System error: " + err.message });
+    });
+
     let output = "";
+    let errorOutput = "";
     ytDlp.stdout.on("data", (data) => output += data.toString());
+    ytDlp.stderr.on("data", (data) => errorOutput += data.toString());
 
     ytDlp.on("close", (code) => {
-        if (code !== 0 || !output.trim()) return res.status(500).json({ error: "Couldn't get video info" });
+        if (code !== 0 || !output.trim()) {
+            console.error("yt-dlp closed with code:", code, "Error:", errorOutput);
+            if (!res.headersSent) res.status(500).json({ error: "Video info not available" });
+            return;
+        }
 
         try {
             const data = JSON.parse(output);
