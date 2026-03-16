@@ -11,6 +11,30 @@ app.get("/", (req, res) => {
     res.send("YouTube Downloader API is Running! 🚀");
 });
 
+// Debug Endpoint - To check if files and binaries are correct on Render
+app.get("/debug", (req, res) => {
+    const fs = require('fs');
+    const files = fs.readdirSync('.');
+    const ytDlpExists = fs.existsSync('./yt-dlp');
+    let ytDlpStats = {};
+    if (ytDlpExists) {
+        const stats = fs.statSync('./yt-dlp');
+        ytDlpStats = {
+            size: stats.size,
+            mode: stats.mode.toString(8)
+        };
+    }
+    res.json({
+        platform: process.platform,
+        currentDir: process.cwd(),
+        files: files,
+        ytDlp: {
+            exists: ytDlpExists,
+            stats: ytDlpStats
+        }
+    });
+});
+
 // 2. Info Endpoint - Gets video Thumbnail, Title, and Quality options
 app.get("/info", (req, res) => {
     const videoURL = req.query.url;
