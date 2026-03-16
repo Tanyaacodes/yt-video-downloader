@@ -8,7 +8,7 @@ app.use(cors()); // Allow website to connect
 
 // 1. Root Endpoint - Just to check if API is working
 app.get("/", (req, res) => {
-    res.send("YouTube Downloader API is Running! 🚀");
+    res.send("StreamVault API is Running Live! 🚀");
 });
 
 // Debug Endpoint - To check if files and binaries are correct on Render
