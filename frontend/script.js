@@ -8,7 +8,7 @@ const formatSelect = document.getElementById("formatSelect");
 // Switch between Local and Live Server automatically
 const BACKEND_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
     ? "http://localhost:5000" 
-    : "https://your-backend-name.onrender.com";
+    : "https://yt-video-downloader-2xka.onrender.com";
 
 let debounceTimer;
 
