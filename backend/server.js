@@ -17,7 +17,9 @@ app.get("/info", (req, res) => {
     if (!videoURL) return res.status(400).json({ error: "Paste a URL first" });
 
     // We use yt-dlp to 'dump' video information in JSON format
-    const ytDlpPath = process.platform === "win32" ? "./yt-dlp.exe" : "yt-dlp";
+    // Cross-platform yt-dlp path
+    const ytDlpPath = process.platform === "win32" ? "./yt-dlp.exe" : "./yt-dlp";
+    console.log(`Using yt-dlp at: ${ytDlpPath} on platform: ${process.platform}`);
     const ytDlp = spawn(ytDlpPath, ["--dump-json", "--skip-download", videoURL]);
 
     let output = "";
@@ -59,7 +61,7 @@ app.get("/download", (req, res) => {
     res.header("Content-Disposition", `attachment; filename="video.mp4"`);
     res.header("Content-Type", "video/mp4");
 
-    const ytDlpPath = process.platform === "win32" ? "./yt-dlp.exe" : "yt-dlp";
+    const ytDlpPath = process.platform === "win32" ? "./yt-dlp.exe" : "./yt-dlp";
     const ytDlp = spawn(ytDlpPath, ["-f", format, "-o", "-", videoURL]);
 
     // Pipe the data directly to the user's browser
