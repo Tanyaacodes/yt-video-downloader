@@ -1,0 +1,17 @@
+# Exclude node_modules from all subfolders
+**/node_modules/
+
+# Exclude environment files
+.env
+**/.env
+
+# Exclude Windows specific executables
+backend/yt-dlp.exe
+
+# Exclude OS generated files
+.DS_Store
+Thumbs.db
+
+# Exclude logs
+*.log
+**/logs/
