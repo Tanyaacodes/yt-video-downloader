@@ -49,9 +49,10 @@ app.get("/info", (req, res) => {
         "--dump-json",
         "--skip-download",
         "--no-playlist",
+        "--cookies", "./cookies.txt",
         "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "--add-header", "Accept-Language:en-US,en;q=0.9",
-        "--extractor-args", "youtube:player_client=android,web",
+        "--extractor-args", "youtube:player_client=tv_embedded,ios,web",
         videoURL
     ];
 
@@ -120,8 +121,9 @@ app.get("/download", (req, res) => {
     const args = [
         "-f", format,
         "-o", "-",
+        "--cookies", "./cookies.txt",
         "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "--extractor-args", "youtube:player_client=android,web",
+        "--extractor-args", "youtube:player_client=tv_embedded,ios,web",
         videoURL
     ];
 
