@@ -1,3 +1,4 @@
+// StreamVault Backend - Deployment Sync
 const express = require("express");
 const cors = require("cors");
 const { spawn } = require("child_process");
@@ -40,13 +41,30 @@ app.get("/info", (req, res) => {
     const videoURL = req.query.url;
     if (!videoURL) return res.status(400).json({ error: "Paste a URL first" });
 
-    // We use yt-dlp to 'dump' video information in JSON format
-    // Cross-platform yt-dlp path
     const ytDlpPath = process.platform === "win32" ? "./yt-dlp.exe" : "./yt-dlp";
     console.log(`Using yt-dlp at: ${ytDlpPath} on platform: ${process.platform}`);
-    const ytDlp = spawn(ytDlpPath, ["--dump-json", "--skip-download", videoURL]);
+
+    // Extra flags to bypass YouTube bot detection on cloud servers
+    const args = [
+        "--dump-json",
+        "--skip-download",
+        "--no-playlist",
+        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "--add-header", "Accept-Language:en-US,en;q=0.9",
+        "--extractor-args", "youtube:player_client=android,web",
+        videoURL
+    ];
+
+    const ytDlp = spawn(ytDlpPath, args);
+
+    // Timeout after 30 seconds
+    const timeout = setTimeout(() => {
+        ytDlp.kill();
+        if (!res.headersSent) res.status(504).json({ error: "Request timed out. Try again." });
+    }, 30000);
 
     ytDlp.on("error", (err) => {
+        clearTimeout(timeout);
         console.error("Failed to start yt-dlp:", err);
         if (!res.headersSent) res.status(500).json({ error: "System error: " + err.message });
     });
@@ -54,12 +72,16 @@ app.get("/info", (req, res) => {
     let output = "";
     let errorOutput = "";
     ytDlp.stdout.on("data", (data) => output += data.toString());
-    ytDlp.stderr.on("data", (data) => errorOutput += data.toString());
+    ytDlp.stderr.on("data", (data) => {
+        errorOutput += data.toString();
+        console.log("yt-dlp stderr:", data.toString());
+    });
 
     ytDlp.on("close", (code) => {
+        clearTimeout(timeout);
         if (code !== 0 || !output.trim()) {
             console.error("yt-dlp closed with code:", code, "Error:", errorOutput);
-            if (!res.headersSent) res.status(500).json({ error: "Video info not available" });
+            if (!res.headersSent) res.status(500).json({ error: "Video info not available. YouTube may be blocking the server." });
             return;
         }
 
@@ -70,7 +92,6 @@ app.get("/info", (req, res) => {
                 thumbnail: data.thumbnail,
                 duration: data.duration_string,
                 author: data.uploader,
-                // We filter useful formats (video + audio)
                 formats: data.formats
                     .filter(f => f.ext === 'mp4' || f.format_note === 'tiny' || (f.acodec !== 'none' && f.vcodec === 'none'))
                     .map(f => ({
@@ -92,16 +113,21 @@ app.get("/download", (req, res) => {
 
     if (!videoURL) return res.status(400).send("URL is required");
 
-    // Tell the browser that a file is being downloaded
     res.header("Content-Disposition", `attachment; filename="video.mp4"`);
     res.header("Content-Type", "video/mp4");
 
     const ytDlpPath = process.platform === "win32" ? "./yt-dlp.exe" : "./yt-dlp";
-    const ytDlp = spawn(ytDlpPath, ["-f", format, "-o", "-", videoURL]);
+    const args = [
+        "-f", format,
+        "-o", "-",
+        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "--extractor-args", "youtube:player_client=android,web",
+        videoURL
+    ];
 
-    // Pipe the data directly to the user's browser
+    const ytDlp = spawn(ytDlpPath, args);
+
     ytDlp.stdout.pipe(res);
-
     ytDlp.on("error", (err) => console.log("Process error:", err));
 });
 
