@@ -6,7 +6,7 @@ const qualitySelection = document.getElementById("qualitySelection");
 const formatSelect = document.getElementById("formatSelect");
 
 // Switch between Local and Live Server automatically
-const BACKEND_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
+const BACKEND_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname === ""
     ? "http://localhost:5000" 
     : "https://yt-video-downloader-2xka.onrender.com";
 
