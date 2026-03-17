@@ -1,136 +1,150 @@
-// StreamVault Backend - Deployment Sync
+// StreamVault Backend - RapidAPI Version
 const express = require("express");
 const cors = require("cors");
-const { spawn } = require("child_process");
 
 const app = express();
+app.use(cors());
 
-app.use(cors()); // Allow website to connect
+// =============================================
+// 🔑 REPLACE YOUR RAPIDAPI KEY HERE
+const RAPIDAPI_KEY = "4956c10e1fmsh9ac28e64f0c8e48p1b6255jsn480e344d510a";
+// =============================================
+const RAPIDAPI_HOST = "youtube-media-downloader.p.rapidapi.com";
 
-// 1. Root Endpoint - Just to check if API is working
+// 1. Root Endpoint
 app.get("/", (req, res) => {
     res.send("StreamVault API is Running Live! 🚀");
 });
 
-// Debug Endpoint - To check if files and binaries are correct on Render
-app.get("/debug", (req, res) => {
-    const fs = require('fs');
-    const files = fs.readdirSync('.');
-    const ytDlpExists = fs.existsSync('./yt-dlp');
-    let ytDlpStats = {};
-    if (ytDlpExists) {
-        const stats = fs.statSync('./yt-dlp');
-        ytDlpStats = {
-            size: stats.size,
-            mode: stats.mode.toString(8)
-        };
-    }
-    res.json({
-        platform: process.platform,
-        currentDir: process.cwd(),
-        files: files,
-        ytDlp: {
-            exists: ytDlpExists,
-            stats: ytDlpStats
-        }
-    });
-});
-
 // 2. Info Endpoint - Gets video Thumbnail, Title, and Quality options
-app.get("/info", (req, res) => {
+app.get("/info", async (req, res) => {
     const videoURL = req.query.url;
     if (!videoURL) return res.status(400).json({ error: "Paste a URL first" });
 
-    const ytDlpPath = process.platform === "win32" ? "./yt-dlp.exe" : "./yt-dlp";
-    console.log(`Using yt-dlp at: ${ytDlpPath} on platform: ${process.platform}`);
+    // Extract video ID from URL
+    const videoIdMatch = videoURL.match(/(?:v=|youtu\.be\/)([^&\n?#]+)/);
+    if (!videoIdMatch) return res.status(400).json({ error: "Invalid YouTube URL" });
+    const videoId = videoIdMatch[1];
 
-    // Extra flags to bypass YouTube bot detection on cloud servers
-    const args = [
-        "--dump-json",
-        "--skip-download",
-        "--no-playlist",
-        "--cookies", "./cookies.txt",
-        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "--add-header", "Accept-Language:en-US,en;q=0.9",
-        "--extractor-args", "youtube:player_client=tv_embedded,ios,web",
-        videoURL
-    ];
+    try {
+        const response = await fetch(
+            `https://${RAPIDAPI_HOST}/v2/video/details?videoId=${videoId}`,
+            {
+                headers: {
+                    // 🔑 API KEY IS USED HERE
+                    "x-rapidapi-key": RAPIDAPI_KEY,
+                    "x-rapidapi-host": RAPIDAPI_HOST,
+                    "Content-Type": "application/json"
+                }
+            }
+        );
 
-    const ytDlp = spawn(ytDlpPath, args);
+        const data = await response.json();
 
-    // Timeout after 30 seconds
-    const timeout = setTimeout(() => {
-        ytDlp.kill();
-        if (!res.headersSent) res.status(504).json({ error: "Request timed out. Try again." });
-    }, 30000);
-
-    ytDlp.on("error", (err) => {
-        clearTimeout(timeout);
-        console.error("Failed to start yt-dlp:", err);
-        if (!res.headersSent) res.status(500).json({ error: "System error: " + err.message });
-    });
-
-    let output = "";
-    let errorOutput = "";
-    ytDlp.stdout.on("data", (data) => output += data.toString());
-    ytDlp.stderr.on("data", (data) => {
-        errorOutput += data.toString();
-        console.log("yt-dlp stderr:", data.toString());
-    });
-
-    ytDlp.on("close", (code) => {
-        clearTimeout(timeout);
-        if (code !== 0 || !output.trim()) {
-            console.error("yt-dlp closed with code:", code, "Error:", errorOutput);
-            if (!res.headersSent) res.status(500).json({ error: "Video info not available. YouTube may be blocking the server." });
-            return;
+        if (!data || data.status === false) {
+            return res.status(500).json({ error: "Could not fetch video info" });
         }
 
-        try {
-            const data = JSON.parse(output);
-            res.json({
-                title: data.title,
-                thumbnail: data.thumbnail,
-                duration: data.duration_string,
-                author: data.uploader,
-                formats: data.formats
-                    .filter(f => f.ext === 'mp4' || f.format_note === 'tiny' || (f.acodec !== 'none' && f.vcodec === 'none'))
-                    .map(f => ({
-                        format_id: f.format_id,
-                        extension: f.ext,
-                        resolution: f.resolution || f.format_note || "Audio only"
-                    }))
+        // Build formats list for video
+        const formats = [];
+
+        // Add video formats
+        if (data.videos && data.videos.items) {
+            data.videos.items.forEach(v => {
+                formats.push({
+                    format_id: v.url,
+                    extension: "mp4",
+                    resolution: v.quality || v.qualityLabel || "Video",
+                    type: "video"
+                });
             });
-        } catch (e) {
-            res.status(500).json({ error: "Error parsing video info" });
         }
-    });
+
+        // Add audio formats
+        if (data.audios && data.audios.items) {
+            data.audios.items.forEach(a => {
+                formats.push({
+                    format_id: a.url,
+                    extension: "mp3",
+                    resolution: "Audio only",
+                    type: "audio"
+                });
+            });
+        }
+
+        res.json({
+            title: data.title,
+            thumbnail: data.thumbnail?.url || data.thumbnails?.[0]?.url || "",
+            duration: data.lengthText || "",
+            author: data.channelTitle || data.author || "",
+            formats: formats
+        });
+
+    } catch (err) {
+        console.error("RapidAPI error:", err);
+        res.status(500).json({ error: "Server error: " + err.message });
+    }
 });
 
-// 3. Download Endpoint - Streams the actual video file to the user
-app.get("/download", (req, res) => {
+// 3. Download Endpoint - Redirects to direct download URL
+app.get("/download", async (req, res) => {
     const videoURL = req.query.url;
-    const format = req.query.format || "best";
+    const format = req.query.format;
+    const type = req.query.type || "video"; // "video" or "audio"
 
     if (!videoURL) return res.status(400).send("URL is required");
 
-    res.header("Content-Disposition", `attachment; filename="video.mp4"`);
-    res.header("Content-Type", "video/mp4");
+    const videoIdMatch = videoURL.match(/(?:v=|youtu\.be\/)([^&\n?#]+)/);
+    if (!videoIdMatch) return res.status(400).send("Invalid YouTube URL");
+    const videoId = videoIdMatch[1];
 
-    const ytDlpPath = process.platform === "win32" ? "./yt-dlp.exe" : "./yt-dlp";
-    const args = [
-        "-f", format,
-        "-o", "-",
-        "--cookies", "./cookies.txt",
-        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "--extractor-args", "youtube:player_client=tv_embedded,ios,web",
-        videoURL
-    ];
+    try {
+        const response = await fetch(
+            `https://${RAPIDAPI_HOST}/v2/video/details?videoId=${videoId}`,
+            {
+                headers: {
+                    // 🔑 API KEY IS USED HERE
+                    "x-rapidapi-key": RAPIDAPI_KEY,
+                    "x-rapidapi-host": RAPIDAPI_HOST,
+                    "Content-Type": "application/json"
+                }
+            }
+        );
 
-    const ytDlp = spawn(ytDlpPath, args);
+        const data = await response.json();
 
-    ytDlp.stdout.pipe(res);
-    ytDlp.on("error", (err) => console.log("Process error:", err));
+        let downloadUrl = null;
+
+        if (type === "audio") {
+            // Get best audio
+            if (data.audios && data.audios.items && data.audios.items.length > 0) {
+                downloadUrl = data.audios.items[0].url;
+            }
+        } else {
+            // Get selected video format or best
+            if (data.videos && data.videos.items) {
+                if (format && format !== "best") {
+                    const found = data.videos.items.find(v => v.url === format);
+                    downloadUrl = found ? found.url : data.videos.items[0].url;
+                } else {
+                    downloadUrl = data.videos.items[0].url;
+                }
+            }
+        }
+
+        if (!downloadUrl) return res.status(500).send("Download URL not found");
+
+        // Set filename
+        const filename = type === "audio" ? "audio.mp3" : "video.mp4";
+        res.header("Content-Disposition", `attachment; filename="${filename}"`);
+
+        // Redirect to direct URL
+        res.redirect(downloadUrl);
+
+    } catch (err) {
+        console.error("Download error:", err);
+        res.status(500).send("Server error: " + err.message);
+    }
 });
 
 // Start Server
