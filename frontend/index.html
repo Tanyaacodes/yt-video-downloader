@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StreamVault | YouTube Downloader</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <!-- Lucide Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -17,56 +15,183 @@
     <div class="blob"></div>
     <div class="blob2"></div>
 
-    <div class="container">
-        <div class="card">
-            <div class="logo">
-                <i data-lucide="download-cloud"></i>
-            </div>
-            <h1>Stream<span>Vault</span></h1>
-            <p>Download your favorite videos instantly</p>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i data-lucide="download-cloud"></i>
+            <span>StreamVault</span>
+        </div>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#how-it-works">How it works</a>
+            <a href="#faq">FAQ</a>
+        </div>
+    </nav>
 
-            <div class="input-group">
-                <i data-lucide="link-2"></i>
-                <input 
-                    type="text" 
-                    id="urlInput" 
-                    placeholder="Paste YouTube URL here..."
-                    autocomplete="off"
-                    oninput="handleUrlChange()"
-                />
+    <div class="container main-layout">
+        <!-- Hero Left Side -->
+        <div class="hero-content">
+            <span class="overbrow">FAST. SAFE. NO LIMITS.</span>
+            <h1>Turn <em>YouTube</em><br>into MP4 & MP3<br>in <em>seconds.</em></h1>
+            <p class="hero-desc">A focused downloader with a premium cinematic design and a blazing fast backend. Paste a link, pick your format, and bounce.</p>
+            
+            <div class="hero-actions">
+                <button class="primary-ghost" onclick="document.getElementById('urlInput').focus()">Start converting</button>
             </div>
 
-            <!-- Preview Card (Hidden initially) -->
-            <div id="previewCard" class="preview-card hidden">
-                <div class="thumbnail-wrapper">
-                    <img id="videoThumbnail" src="" alt="Thumbnail">
-                    <span id="videoDuration" class="duration-badge">0:00</span>
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <h4>1080p / 320kbps</h4>
+                    <span>High quality</span>
                 </div>
-                <div class="video-details">
-                    <h3 id="videoTitle">Video Title</h3>
-                    <p id="videoAuthor">Channel Name</p>
+                <div class="stat-item">
+                    <h4>Fast & Direct</h4>
+                    <span>No waiting queues</span>
+                </div>
+                <div class="stat-item">
+                    <h4>Zero setup</h4>
+                    <span>Just paste & go</span>
                 </div>
             </div>
+        </div>
 
-            <div id="qualitySelection" class="quality-selection hidden">
-                <label for="formatSelect">Select Quality</label>
-                <select id="formatSelect">
-                    <option value="best">Best Quality (Default)</option>
-                </select>
+        <!-- Tool Right Side -->
+        <div class="tool-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Convert a YouTube link</h2>
+                    <p>Paste a public link. We'll process the video and deliver your file instantly.</p>
+                </div>
+
+                <div class="input-container">
+                    <label>YouTube URL</label>
+                    <div class="input-group">
+                        <i data-lucide="link-2"></i>
+                        <input 
+                            type="text" 
+                            id="urlInput" 
+                            placeholder="https://www.youtube.com/watch?v=..."
+                            autocomplete="off"
+                            oninput="handleUrlChange()"
+                        />
+                    </div>
+                </div>
+
+                <!-- Preview Card (Hidden initially) -->
+                <div id="previewCard" class="preview-card hidden">
+                    <div class="thumbnail-wrapper">
+                        <img id="videoThumbnail" src="" alt="Thumbnail">
+                        <span id="videoDuration" class="duration-badge">0:00</span>
+                    </div>
+                    <div class="video-details">
+                        <h3 id="videoTitle">Video Title</h3>
+                        <p id="videoAuthor">Channel Name</p>
+                    </div>
+                </div>
+
+                <!-- Quality Selection Grid -->
+                <div id="qualitySelection" class="quality-selection-grid hidden">
+                    <div class="select-box">
+                        <label for="formatSelect">Video Quality</label>
+                        <div class="custom-select-wrapper">
+                            <select id="formatSelect">
+                                <option value="best">Best Quality (Default)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="select-box">
+                        <label for="audioFormatSelect">Audio Quality</label>
+                        <div class="custom-select-wrapper">
+                            <select id="audioFormatSelect">
+                                <option value="best">High Quality - 320kbps</option>
+                                <option value="best">Standard - 128kbps</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="statusMessage" class="status-message"></div>
+
+                <!-- Download Buttons Row -->
+                <div class="btn-group hidden" id="actionButtons">
+                    <button id="downloadBtn" onclick="downloadVideo()">
+                        <i data-lucide="film"></i>
+                        <span class="btn-text">Download Video</span>
+                    </button>
+
+                    <button id="mp3Btn" onclick="downloadMp3()" class="mp3-btn">
+                        <i data-lucide="headphones"></i>
+                        <span class="btn-text">Download Audio</span>
+                    </button>
+                </div>
             </div>
+        </div>
+    </div>
 
-            <button id="downloadBtn" onclick="downloadVideo()">
-                <span class="btn-text">Download Now</span>
-                <i data-lucide="arrow-right"></i>
-            </button>
+    <!-- Extra Sections -->
+    <div class="container text-section" id="features">
+        <h2 class="section-title">Features</h2>
+        <div class="grid-3">
+            <div class="feature-card">
+                <i data-lucide="zap"></i>
+                <h3>Lightning Fast</h3>
+                <p>We process your requests on-the-fly and fetch the best available direct download links without delaying.</p>
+            </div>
+            <div class="feature-card">
+                <i data-lucide="shield-check"></i>
+                <h3>Secure & Private</h3>
+                <p>Your data is completely safe. We don't store your files or track the videos you are downloading.</p>
+            </div>
+            <div class="feature-card">
+                <i data-lucide="mic"></i>
+                <h3>Audio & Video Options</h3>
+                <p>Enjoy studio-grade MP3 downloads or breathtaking 1080p MP4 videos. The choice is yours.</p>
+            </div>
+        </div>
+    </div>
 
-            <div id="statusMessage" class="status-message"></div>
+    <div class="container text-section" id="how-it-works">
+        <h2 class="section-title">How it works</h2>
+        <div class="how-steps">
+            <div class="step">
+                <div class="step-num">1</div>
+                <h4>Copy URL</h4>
+                <p>Go to your favorite YouTube video, click share, and copy the video's public URL.</p>
+            </div>
+            <div class="step-line"></div>
+            <div class="step">
+                <div class="step-num">2</div>
+                <h4>Paste & Preview</h4>
+                <p>Paste the link into StreamVault. We instantly fetch the video's thumbnail, title, and formats available.</p>
+            </div>
+            <div class="step-line"></div>
+            <div class="step">
+                <div class="step-num">3</div>
+                <h4>Download File</h4>
+                <p>Select your desired quality from the drop downs, click Download Video or Audio, and boom, it's saved.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="container text-section" id="faq" style="margin-bottom: 80px;">
+        <h2 class="section-title">FAQ</h2>
+        <div class="faq-list">
+            <div class="faq-item">
+                <h4>Is it free to use?</h4>
+                <p>Yes, StreamVault is totally free to use for personal downloads without any hidden charges.</p>
+            </div>
+            <div class="faq-item">
+                <h4>Do I need to install any software?</h4>
+                <p>No, our solution is fully web-based. You don't need any extensions or software on your device.</p>
+            </div>
+            <div class="faq-item">
+                <h4>What audio formats are supported?</h4>
+                <p>By default all audio files are downloaded in high-quality MP3 format. The exact bitrate depends on YouTube's original source file.</p>
+            </div>
         </div>
     </div>
 
     <script src="script.js"></script>
     <script>
-        // Initialize icons
         lucide.createIcons();
     </script>
 </body>

@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "cors": "^2.8.6",
-    "express": "^4.19.2"
+    "dotenv": "^17.3.1",
+    "express": "^4.19.2",
+    "pdf-parse": "^2.4.5"
   }
 }

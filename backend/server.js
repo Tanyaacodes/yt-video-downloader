@@ -1,4 +1,4 @@
-// StreamVault Backend - RapidAPI Version
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
@@ -6,14 +6,14 @@ const app = express();
 app.use(cors());
 
 // =============================================
-// 🔑 REPLACE YOUR RAPIDAPI KEY HERE
-const RAPIDAPI_KEY = "4956c10e1fmsh9ac28e64f0c8e48p1b6255jsn480e344d510a";
+// Settings are now loaded from .env file
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 // =============================================
-const RAPIDAPI_HOST = "youtube-media-downloader.p.rapidapi.com";
+const RAPIDAPI_HOST = "yt-api.p.rapidapi.com";
 
 // 1. Root Endpoint
 app.get("/", (req, res) => {
-    res.send("StreamVault API is Running Live! 🚀");
+    res.send("StreamVault API is Running Live! 🚀 (New API)");
 });
 
 // 2. Info Endpoint - Gets video Thumbnail, Title, and Quality options
@@ -28,56 +28,75 @@ app.get("/info", async (req, res) => {
 
     try {
         const response = await fetch(
-            `https://${RAPIDAPI_HOST}/v2/video/details?videoId=${videoId}`,
+            `https://${RAPIDAPI_HOST}/dl?id=${videoId}`,
             {
+                method: "GET",
                 headers: {
-                    // 🔑 API KEY IS USED HERE
                     "x-rapidapi-key": RAPIDAPI_KEY,
-                    "x-rapidapi-host": RAPIDAPI_HOST,
-                    "Content-Type": "application/json"
+                    "x-rapidapi-host": RAPIDAPI_HOST
                 }
             }
         );
 
         const data = await response.json();
 
-        if (!data || data.status === false) {
-            return res.status(500).json({ error: "Could not fetch video info" });
+        if (!data || data.status !== "OK" || !data.title) {
+            return res.status(500).json({ error: "Could not fetch video info: " + (data.msg || "Unknown error") });
         }
 
-        // Build formats list for video
-        const formats = [];
+        // Build formats list for frontend
+        const formatsList = [];
 
-        // Add video formats
-        if (data.videos && data.videos.items) {
-            data.videos.items.forEach(v => {
-                formats.push({
-                    format_id: v.url,
-                    extension: "mp4",
-                    resolution: v.quality || v.qualityLabel || "Video",
-                    type: "video"
-                });
+        // 1. Regular Formats (Usually video + audio combined)
+        if (data.formats) {
+            data.formats.forEach(f => {
+                const mimeType = f.mimeType || "";
+                if (mimeType.includes("video/mp4")) {
+                    formatsList.push({
+                        format_id: String(f.itag),
+                        extension: "mp4",
+                        resolution: f.qualityLabel || "MP4 Normal",
+                        type: "video"
+                    });
+                }
             });
         }
 
-        // Add audio formats
-        if (data.audios && data.audios.items) {
-            data.audios.items.forEach(a => {
-                formats.push({
-                    format_id: a.url,
-                    extension: "mp3",
-                    resolution: "Audio only",
-                    type: "audio"
-                });
+        // 2. Adaptive Formats (Usually separate streams)
+        if (data.adaptiveFormats) {
+            data.adaptiveFormats.forEach(f => {
+                const mimeType = f.mimeType || "";
+                // Capture audio only (usually mp4a)
+                if (mimeType.includes("audio/")) {
+                    formatsList.push({
+                        format_id: String(f.itag),
+                        extension: "mp3",
+                        resolution: (f.audioQuality || "128kbps").replace("AUDIO_QUALITY_", ""),
+                        type: "audio"
+                    });
+                }
+                // Capture high res videos if not in regular formats
+                else if (mimeType.includes("video/mp4") && !formatsList.some(ex => ex.resolution === f.qualityLabel)) {
+                     formatsList.push({
+                        format_id: String(f.itag),
+                        extension: "mp4",
+                        resolution: f.qualityLabel || "HD",
+                        type: "video"
+                    });
+                }
             });
         }
+
+        const durationSec = parseInt(data.lengthSeconds);
+        const durationStr = !isNaN(durationSec) ? `${Math.floor(durationSec/60)}:${(durationSec%60).toString().padStart(2, '0')}` : "";
+        const thumbnail = data.thumbnail && data.thumbnail.length > 0 ? data.thumbnail[data.thumbnail.length - 1].url : "";
 
         res.json({
             title: data.title,
-            thumbnail: data.thumbnail?.url || data.thumbnails?.[0]?.url || "",
-            duration: data.lengthText || "",
-            author: data.channelTitle || data.author || "",
-            formats: formats
+            thumbnail: thumbnail,
+            duration: durationStr,
+            author: data.author || "",
+            formats: formatsList
         });
 
     } catch (err) {
@@ -89,7 +108,7 @@ app.get("/info", async (req, res) => {
 // 3. Download Endpoint - Redirects to direct download URL
 app.get("/download", async (req, res) => {
     const videoURL = req.query.url;
-    const format = req.query.format;
+    const formatItag = req.query.format;
     const type = req.query.type || "video"; // "video" or "audio"
 
     if (!videoURL) return res.status(400).send("URL is required");
@@ -100,43 +119,41 @@ app.get("/download", async (req, res) => {
 
     try {
         const response = await fetch(
-            `https://${RAPIDAPI_HOST}/v2/video/details?videoId=${videoId}`,
+            `https://${RAPIDAPI_HOST}/dl?id=${videoId}`,
             {
+                method: "GET",
                 headers: {
-                    // 🔑 API KEY IS USED HERE
                     "x-rapidapi-key": RAPIDAPI_KEY,
-                    "x-rapidapi-host": RAPIDAPI_HOST,
-                    "Content-Type": "application/json"
+                    "x-rapidapi-host": RAPIDAPI_HOST
                 }
             }
         );
 
         const data = await response.json();
+        if (data.status !== "OK") return res.status(500).send("Cloud API failed");
 
         let downloadUrl = null;
 
-        if (type === "audio") {
-            // Get best audio
-            if (data.audios && data.audios.items && data.audios.items.length > 0) {
-                downloadUrl = data.audios.items[0].url;
-            }
-        } else {
-            // Get selected video format or best
-            if (data.videos && data.videos.items) {
-                if (format && format !== "best") {
-                    const found = data.videos.items.find(v => v.url === format);
-                    downloadUrl = found ? found.url : data.videos.items[0].url;
-                } else {
-                    downloadUrl = data.videos.items[0].url;
-                }
+        // Find itag specific format
+        const allFormats = [...(data.formats || []), ...(data.adaptiveFormats || [])];
+        
+        if (formatItag && formatItag !== "best") {
+            const found = allFormats.find(f => String(f.itag) === formatItag);
+            if (found) downloadUrl = found.url;
+        }
+
+        // Fallback to best quality if not found or "best"
+        if (!downloadUrl) {
+            if (type === "audio") {
+                const audios = (data.adaptiveFormats || []).filter(f => f.mimeType.includes("audio/"));
+                if (audios.length > 0) downloadUrl = audios[0].url;
+            } else {
+                const videos = (data.formats || []).filter(f => f.mimeType.includes("video/mp4"));
+                if (videos.length > 0) downloadUrl = videos[0].url;
             }
         }
 
-        if (!downloadUrl) return res.status(500).send("Download URL not found");
-
-        // Set filename
-        const filename = type === "audio" ? "audio.mp3" : "video.mp4";
-        res.header("Content-Disposition", `attachment; filename="${filename}"`);
+        if (!downloadUrl) return res.status(500).send("Download link not available for this video.");
 
         // Redirect to direct URL
         res.redirect(downloadUrl);
